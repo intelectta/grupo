@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Collab System Dashboard</title>
+<style>
+  body {font-family: Arial, sans-serif; background:#f5f7fa; color:#333; margin:0; padding:20px;}
+  h1 {text-align:center; margin-bottom:10px;}
+  h2 {margin-top:30px;}
+  .section {background:#fff; border-radius:10px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:20px;}
+  table {width:100%; border-collapse:collapse; margin-top:10px;}
+  th, td {padding:8px; border-bottom:1px solid #ddd; text-align:left;}
+  input[type=text], textarea {width:100%; padding:6px; border-radius:6px; border:1px solid #ccc;}
+  button {padding:6px 10px; border:none; border-radius:6px; background:#0077cc; color:#fff; cursor:pointer;}
+  button:hover {background:#005fa3;}
+  .tools-grid {display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:15px;}
+  .tool {background:#eef3f8; border-radius:10px; padding:12px; text-align:center;}
+  .tool a {color:#0077cc; text-decoration:none; font-weight:bold;}
+  .tool a:hover {text-decoration:underline;}
+  small {display:block; color:#666; margin-top:6px;}
+</style>
+</head>
+<body>
+
+<h1>🌐 Free Collab System Dashboard</h1>
+<p style="text-align:center;">All-free tools for individual follow-up, newsletter & shared data</p>
+
+<div class="section">
+  <h2>👥 Participants</h2>
+  <table id="participantsTable">
+    <thead><tr><th>Name</th><th>Role / Function</th><th>Notes</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <h3>Add Participant</h3>
+  <input type="text" id="nameInput" placeholder="Name">
+  <input type="text" id="roleInput" placeholder="Role or Function">
+  <textarea id="notesInput" placeholder="Notes or follow-up details"></textarea>
+  <button onclick="addParticipant()">Add</button>
+</div>
+
+<div class="section">
+  <h2>🔗 Main Tools (100% Free)</h2>
+  <div class="tools-grid">
+    <div class="tool">
+      <a href="https://forms.google.com/" target="_blank">Google Forms</a>
+      <small>Collect individual data & feedback</small>
+    </div>
+    <div class="tool">
+      <a href="https://sheets.google.com/" target="_blank">Google Sheets</a>
+      <small>View and analyze group data</small>
+    </div>
+    <div class="tool">
+      <a href="https://substack.com/" target="_blank">Substack</a>
+      <small>Send newsletters to all participants</small>
+    </div>
+    <div class="tool">
+      <a href="https://meet.jit.si/" target="_blank">Jitsi Meet</a>
+      <small>Free video meetings (no signup)</small>
+    </div>
+    <div class="tool">
+      <a href="https://etherpad.org/" target="_blank">Etherpad</a>
+      <small>Collaborative writing, real-time editing</small>
+    </div>
+    <div class="tool">
+      <a href="https://cryptpad.fr/" target="_blank">CryptPad</a>
+      <small>Encrypted docs, forms, and kanban</small>
+    </div>
+    <div class="tool">
+      <a href="https://metabase.com/" target="_blank">Metabase</a>
+      <small>Analyze shared data dashboards</small>
+    </div>
+    <div class="tool">
+      <a href="https://nextcloud.com/" target="_blank">Nextcloud Hub</a>
+      <small>Private all-in-one collaboration hub</small>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📝 Quick Notes</h2>
+  <textarea id="quickNotes" placeholder="Write meeting notes, reflections or collective goals..." rows="6"></textarea><br>
+  <button onclick="saveNotes()">Save Notes</button>
+</div>
+
+<script>
+const tableBody = document.querySelector("#participantsTable tbody");
+let participants = JSON.parse(localStorage.getItem("participantsData") || "[]");
+function renderTable(){
+  tableBody.innerHTML="";
+  participants.forEach((p,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${p.name}</td><td>${p.role}</td><td>${p.notes}</td>`;
+    tableBody.appendChild(tr);
+  });
+}
+function addParticipant(){
+  const name=document.getElementById("nameInput").value.trim();
+  const role=document.getElementById("roleInput").value.trim();
+  const notes=document.getElementById("notesInput").value.trim();
+  if(!name) return alert("Please enter a name");
+  participants.push({name,role,notes});
+  localStorage.setItem("participantsData",JSON.stringify(participants));
+  renderTable();
+  document.getElementById("nameInput").value="";
+  document.getElementById("roleInput").value="";
+  document.getElementById("notesInput").value="";
+}
+function saveNotes(){
+  localStorage.setItem("quickNotes",document.getElementById("quickNotes").value);
+  alert("Notes saved locally!");
+}
+document.getElementById("quickNotes").value=localStorage.getItem("quickNotes")||"";
+renderTable();
+</script>
+
+</body>
+</html>
