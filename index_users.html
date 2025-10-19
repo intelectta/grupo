@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌐 DIREÇÃO - iectta</title>
+<style>
+  body {font-family: Arial, sans-serif; background:#f5f7fa; color:#333; margin:0; padding:20px; transition:background .3s,color .3s,filter .3s;}
+  h1 {text-align:center; margin-bottom:10px;}
+  h2 {margin-top:30px;}
+  .section {background:#fff; border-radius:10px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:20px;}
+  table {width:100%; border-collapse:collapse; margin-top:10px;}
+  th, td {padding:8px; border-bottom:1px solid #ddd; text-align:left;}
+  input[type=text], textarea {width:100%; padding:6px; border-radius:6px; border:1px solid #ccc;}
+  button {padding:8px 12px; border:none; border-radius:6px; background:#0077cc; color:#fff; cursor:pointer; margin:6px 4px 0 0;}
+  button:hover {background:#005fa3;}
+  .tools-grid {display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:15px;}
+  .tool {background:#eef3f8; border-radius:10px; padding:12px; text-align:center;}
+  .tool a {color:#0077cc; text-decoration:none; font-weight:bold;}
+  .tool a:hover {text-decoration:underline;}
+  small {display:block; color:#666; margin-top:6px;}
+  .dark {background:#1e1f22; color:#ddd;}
+  .dark .section{background:#2c2d31; box-shadow:none;}
+  .dark input,.dark textarea{background:#3a3b3f; color:#eee; border:1px solid #555;}
+  .dark table th,.dark table td{border-color:#444;}
+  .topbar {display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  #keyModal {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.45); display:flex; justify-content:center; align-items:center;
+    z-index:1000;
+  }
+  #keyBox {
+    background:#fff; padding:30px; border-radius:10px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.3);
+    max-width:320px; width:90%; z-index:1100;
+  }
+  #keyInput {width:100%; padding:10px; border-radius:6px; border:1px solid #ccc; margin-top:10px;}
+  #contentWrapper.locked {filter:blur(6px);}
+</style>
+</head>
+<body>
+
+<div id="contentWrapper" class="locked">
+  <div class="topbar">
+    <h1>🌐 DIREÇÃO - iectta</h1>
+    <button onclick="toggleDarkMode()">🌗 Modo Escuro/Claro</button>
+  </div>
+  <p style="text-align:center;">Sistema colaborativo criptografado de acompanhamento institucional</p>
+
+  <div class="section">
+    <h2>👥 Participantes</h2>
+    <table id="participantsTable">
+      <thead><tr><th>Nome</th><th>Função / Papel</th><th>Observações</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Adicionar Participante</h3>
+    <input type="text" id="nameInput" placeholder="Nome">
+    <input type="text" id="roleInput" placeholder="Função ou Papel">
+    <textarea id="notesInput" placeholder="Observações ou detalhes de acompanhamento"></textarea>
+    <button onclick="addParticipant()">Adicionar</button>
+  </div>
+
+  <div class="section">
+    <h2>📝 Anotações Rápidas</h2>
+    <textarea id="quickNotes" placeholder="Escreva aqui notas..." rows="6"></textarea><br>
+    <button onclick="saveNotes()">Salvar Anotações</button>
+  </div>
+
+  <div class="section" style="text-align:center;">
+    <h2>📦 Gerenciar Dados</h2>
+    <button onclick="exportData()">⬇️ Exportar</button>
+    <input type="file" id="importFile" accept=".json,.txt" style="display:none" onchange="importData(event)">
+    <button onclick="document.getElementById('importFile').click()">⬆️ Importar</button>
+    <button onclick="resetDatabase()">🧹 Resetar Dados</button>
+  </div>
+</div>
+
+<!-- Modal da chave -->
+<div id="keyModal">
+  <div id="keyBox">
+    <h2>🔐 Digite sua chave de criptografia</h2>
+    <input id="keyInput" type="password" placeholder="Chave de acesso" autofocus>
+    <button id="unlockBtn" onclick="unlockData()">Desbloquear</button>
+  </div>
+</div>
+
+<script>
+const tableBody=document.querySelector("#participantsTable tbody");
+let participants=[];
+let sessionPassword=null;
+
+// === Criptografia ===
+async function deriveKey(password,salt){
+  const enc=new TextEncoder();
+  const keyMaterial=await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},
+    keyMaterial,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]
+  );
+}
+async function encryptData(obj){
+  const enc=new TextEncoder();
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const key=await deriveKey(sessionPassword,salt);
+  const data=enc.encode(JSON.stringify(obj));
+  const encrypted=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,data);
+  const combined=new Uint8Array(salt.byteLength+iv.byteLength+encrypted.byteLength);
+  combined.set(salt,0); combined.set(iv,salt.byteLength); combined.set(new Uint8Array(encrypted),salt.byteLength+iv.byteLength);
+  return btoa(String.fromCharCode(...combined));
+}
+async function decryptData(b64){
+  try{
+    const bytes=new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
+    const salt=bytes.slice(0,16); const iv=bytes.slice(16,28); const data=bytes.slice(28);
+    const key=await deriveKey(sessionPassword,salt);
+    const decrypted=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,data);
+    const dec=new TextDecoder(); return JSON.parse(dec.decode(decrypted));
+  }catch(e){throw new Error("fail");}
+}
+
+// === Dados ===
+function renderTable(){
+  tableBody.innerHTML="";
+  participants.forEach(p=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${p.name}</td><td>${p.role}</td><td>${p.notes}</td>`;
+    tableBody.appendChild(tr);
+  });
+}
+function addParticipant(){
+  const name=document.getElementById("nameInput").value.trim();
+  const role=document.getElementById("roleInput").value.trim();
+  const notes=document.getElementById("notesInput").value.trim();
+  if(!name)return alert("Insira o nome.");
+  participants.push({name,role,notes});
+  saveEncrypted();
+  renderTable();
+  document.getElementById("nameInput").value="";
+  document.getElementById("roleInput").value="";
+  document.getElementById("notesInput").value="";
+}
+async function saveEncrypted(){
+  const data={participants,notes:document.getElementById("quickNotes").value};
+  const enc=await encryptData(data);
+  localStorage.setItem("encryptedDB",enc);
+}
+function saveNotes(){
+  saveEncrypted().then(()=>alert("Anotações salvas com criptografia!"));
+}
+async function exportData(){
+  const data={participants,notes:document.getElementById("quickNotes").value};
+  const enc=await encryptData(data);
+  const blob=new Blob([enc],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="dados_iectta_encrypted.txt";
+  a.click();
+}
+async function importData(event){
+  const file=event.target.files[0]; if(!file)return;
+  const text=await file.text();
+  try{
+    const imported=await decryptData(text);
+    participants=imported.participants||[];
+    document.getElementById("quickNotes").value=imported.notes||"";
+    renderTable(); saveEncrypted();
+    alert("Dados importados e descriptografados com sucesso!");
+  }catch(e){alert("Chave incorreta ou dados inválidos.");}
+}
+function resetDatabase(){
+  if(confirm("Tem certeza que deseja apagar todos os dados locais? Esta ação não pode ser desfeita.")){
+    localStorage.removeItem("encryptedDB");
+    participants=[];
+    document.getElementById("quickNotes").value="";
+    renderTable();
+    alert("Banco de dados local apagado com sucesso!");
+  }
+}
+
+// === Tema ===
+function toggleDarkMode(){
+  document.body.classList.toggle("dark");
+  localStorage.setItem("darkMode",document.body.classList.contains("dark"));
+}
+if(localStorage.getItem("darkMode")==="true")document.body.classList.add("dark");
+
+// === Desbloqueio ===
+async function unlockData(){
+  const pw=document.getElementById("keyInput").value.trim();
+  if(!pw)return alert("Digite uma chave.");
+  sessionPassword=pw;
+  const stored=localStorage.getItem("encryptedDB");
+  if(stored){
+    try{
+      const decrypted=await decryptData(stored);
+      participants=decrypted.participants||[];
+      document.getElementById("quickNotes").value=decrypted.notes||"";
+      renderTable();
+    }catch(e){alert("Chave incorreta ou dados inválidos.");return;}
+  }else{
+    participants=[];document.getElementById("quickNotes").value="";
+  }
+  document.getElementById("keyModal").style.display="none";
+  document.getElementById("contentWrapper").classList.remove("locked");
+}
+
+// === Foco inicial e tecla ENTER ===
+window.addEventListener("load",()=>{
+  const input=document.getElementById("keyInput");
+  input.focus();
+  input.addEventListener("keypress",e=>{
+    if(e.key==="Enter"){e.preventDefault();unlockData();}
+  });
+});
+</script>
+
+</body>
+</html>
