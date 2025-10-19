@@ -2,165 +2,78 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema de Colaboração Livre</title>
+<title>Sistema de Colaboração</title>
 <style>
-  body {font-family: Arial, sans-serif; background:#f5f7fa; color:#333; margin:0; padding:20px; transition:background .3s,color .3s;}
-  h1 {text-align:center; margin-bottom:10px;}
-  h2 {margin-top:30px;}
-  .section {background:#fff; border-radius:10px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:20px;}
-  table {width:100%; border-collapse:collapse; margin-top:10px;}
-  th, td {padding:8px; border-bottom:1px solid #ddd; text-align:left;}
-  input[type=text], textarea {width:100%; padding:6px; border-radius:6px; border:1px solid #ccc;}
-  button {padding:6px 10px; border:none; border-radius:6px; background:#0077cc; color:#fff; cursor:pointer; margin-top:6px;}
-  button:hover {background:#005fa3;}
-  .tools-grid {display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:15px;}
-  .tool {background:#eef3f8; border-radius:10px; padding:12px; text-align:center;}
-  .tool a {color:#0077cc; text-decoration:none; font-weight:bold;}
-  .tool a:hover {text-decoration:underline;}
-  small {display:block; color:#666; margin-top:6px;}
-  .dark {background:#1e1f22; color:#ddd;}
-  .dark .section{background:#2c2d31; box-shadow:none;}
-  .dark input,.dark textarea{background:#3a3b3f; color:#eee; border:1px solid #555;}
-  .dark table th,.dark table td{border-color:#444;}
-  .topbar {display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+body{font-family:Arial;background:#f5f7fa;margin:0;padding:20px}
+.section{background:#fff;padding:15px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,0.1);margin-bottom:20px}
+button{background:#0077cc;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{background:#005fa3}
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <h1>🌐 Sistema de Colaboração Livre</h1>
-  <button onclick="toggleDarkMode()">🌗 Modo Escuro/Claro</button>
-</div>
-<p style="text-align:center;">Ferramentas totalmente gratuitas para acompanhamento individual, newsletter e dados conjuntos</p>
+<h1>🌐 Sistema de Colaboração Online</h1>
+<p>Participantes e anotações compartilhados via backend seguro no Render</p>
 
 <div class="section">
   <h2>👥 Participantes</h2>
-  <table id="participantsTable">
-    <thead><tr><th>Nome</th><th>Função / Papel</th><th>Observações</th></tr></thead>
+  <table id="participantsTable" border="1" width="100%">
+    <thead><tr><th>Nome</th><th>Função/Papel</th><th>Observações</th></tr></thead>
     <tbody></tbody>
   </table>
-
   <h3>Adicionar Participante</h3>
-  <input type="text" id="nameInput" placeholder="Nome">
-  <input type="text" id="roleInput" placeholder="Função ou Papel">
-  <textarea id="notesInput" placeholder="Observações ou detalhes de acompanhamento"></textarea>
+  <input id="nameInput" placeholder="Nome"><br>
+  <input id="roleInput" placeholder="Função"><br>
+  <textarea id="notesInput" placeholder="Observações"></textarea><br>
   <button onclick="addParticipant()">Adicionar</button>
-  <button onclick="exportData()">⬇️ Exportar</button>
-  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-  <button onclick="document.getElementById('importFile').click()">⬆️ Importar</button>
 </div>
 
 <div class="section">
-  <h2>🔗 Ferramentas Principais (Gratuitas)</h2>
-  <div class="tools-grid">
-    <div class="tool">
-      <a href="https://forms.google.com/" target="_blank">Google Forms</a>
-      <small>Coletar dados e feedback individual</small>
-    </div>
-    <div class="tool">
-      <a href="https://sheets.google.com/" target="_blank">Google Sheets</a>
-      <small>Visualizar e analisar dados de grupo</small>
-    </div>
-    <div class="tool">
-      <a href="https://substack.com/" target="_blank">Substack</a>
-      <small>Enviar newsletters a todos os participantes</small>
-    </div>
-    <div class="tool">
-      <a href="https://meet.jit.si/" target="_blank">Jitsi Meet</a>
-      <small>Reuniões por vídeo gratuitas (sem login)</small>
-    </div>
-    <div class="tool">
-      <a href="https://etherpad.org/" target="_blank">Etherpad</a>
-      <small>Edição de texto colaborativa em tempo real</small>
-    </div>
-    <div class="tool">
-      <a href="https://cryptpad.fr/" target="_blank">CryptPad</a>
-      <small>Documentos, formulários e kanban criptografados</small>
-    </div>
-    <div class="tool">
-      <a href="https://metabase.com/" target="_blank">Metabase</a>
-      <small>Análise e visualização de dados compartilhados</small>
-    </div>
-    <div class="tool">
-      <a href="https://nextcloud.com/" target="_blank">Nextcloud Hub</a>
-      <small>Hub privado completo de colaboração</small>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <h2>📝 Anotações Rápidas</h2>
-  <textarea id="quickNotes" placeholder="Escreva aqui notas de reuniões, reflexões ou metas coletivas..." rows="6"></textarea><br>
+  <h2>📝 Anotações</h2>
+  <textarea id="quickNotes" rows="6" style="width:100%"></textarea><br>
   <button onclick="saveNotes()">Salvar Anotações</button>
 </div>
 
 <script>
-const tableBody = document.querySelector("#participantsTable tbody");
-let participants = JSON.parse(localStorage.getItem("participantsData") || "[]");
+const API_URL = "https://colab-backend.onrender.com/api";
+const tbody = document.querySelector("#participantsTable tbody");
 
-function renderTable(){
-  tableBody.innerHTML="";
-  participants.forEach((p,i)=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${p.name}</td><td>${p.role}</td><td>${p.notes}</td>`;
-    tableBody.appendChild(tr);
+async function loadData() {
+  const res = await fetch(API_URL + "/data");
+  const data = await res.json();
+  tbody.innerHTML = "";
+  data.participants.forEach(p => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${p.name}</td><td>${p.role}</td><td>${p.notes}</td>`;
+    tbody.appendChild(tr);
   });
+  document.getElementById("quickNotes").value = data.notes || "";
 }
 
-function addParticipant(){
-  const name=document.getElementById("nameInput").value.trim();
-  const role=document.getElementById("roleInput").value.trim();
-  const notes=document.getElementById("notesInput").value.trim();
-  if(!name) return alert("Por favor, insira o nome do participante.");
-  participants.push({name,role,notes});
-  localStorage.setItem("participantsData",JSON.stringify(participants));
-  renderTable();
-  document.getElementById("nameInput").value="";
-  document.getElementById("roleInput").value="";
-  document.getElementById("notesInput").value="";
+async function addParticipant() {
+  const name = document.getElementById("nameInput").value.trim();
+  const role = document.getElementById("roleInput").value.trim();
+  const notes = document.getElementById("notesInput").value.trim();
+  if(!name) return alert("Insira o nome");
+  await fetch(API_URL + "/add", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({name, role, notes})
+  });
+  loadData();
 }
 
-function saveNotes(){
-  localStorage.setItem("quickNotes",document.getElementById("quickNotes").value);
-  alert("Anotações salvas localmente!");
+async function saveNotes() {
+  const notes = document.getElementById("quickNotes").value;
+  await fetch(API_URL + "/notes", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({notes})
+  });
+  alert("Anotações salvas!");
 }
 
-function exportData(){
-  const data={participants, notes:document.getElementById("quickNotes").value};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="dados_colab.json";
-  a.click();
-}
-
-function importData(event){
-  const file=event.target.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      const imported=JSON.parse(e.target.result);
-      participants=imported.participants||[];
-      localStorage.setItem("participantsData",JSON.stringify(participants));
-      document.getElementById("quickNotes").value=imported.notes||"";
-      localStorage.setItem("quickNotes",imported.notes||"");
-      renderTable();
-      alert("Dados importados com sucesso!");
-    }catch(err){alert("Arquivo inválido.");}
-  };
-  reader.readAsText(file);
-}
-
-function toggleDarkMode(){
-  document.body.classList.toggle("dark");
-  localStorage.setItem("darkMode",document.body.classList.contains("dark"));
-}
-
-if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
-document.getElementById("quickNotes").value=localStorage.getItem("quickNotes")||"";
-renderTable();
+loadData();
 </script>
 
 </body>
