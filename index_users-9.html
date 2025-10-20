@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>USERS - iectta</title>
+<style>
+  body {font-family:Arial, sans-serif;background-color:var(--bg);color:var(--fg);margin:0;padding:0;transition:.3s;}
+  :root {--bg:#0d1117;--fg:#e6edf3;--card:#161b22;--accent:#58a6ff;}
+  body.light {--bg:#fff;--fg:#111;--card:#f2f2f2;--accent:#0077ff;}
+  header {display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;background-color:var(--card);}
+  h1{margin:0;font-size:1.3rem;}
+  button,select,textarea,input{background-color:var(--card);color:var(--fg);border:1px solid var(--accent);border-radius:6px;padding:6px 10px;margin:4px;}
+  button:hover{background-color:var(--accent);color:#fff;}
+  textarea{width:100%;min-height:80px;}
+  .container{padding:1rem;max-width:900px;margin:auto;}
+  .statusbar{position:fixed;bottom:0;left:0;right:0;background-color:var(--card);color:var(--fg);text-align:center;padding:.4rem;font-size:.9rem;}
+  .list{margin-top:1rem;}
+  .list-item{background-color:var(--card);padding:.7rem;border-radius:6px;margin-bottom:.5rem;cursor:pointer;}
+  .highlight{border:1px solid var(--accent);}
+</style>
+</head>
+<body>
+<header>
+  <h1>USERS - iectta</h1>
+  <div>
+    <button id="toggleTheme">🌗 Tema</button>
+    <button id="loadEncrypted">🔐 Descriptografar</button>
+    <button id="exportJSON">💾 Exportar</button>
+    <button id="importJSON">📂 Importar</button>
+  </div>
+</header>
+
+<div class="container">
+  <label>Nome:</label>
+  <input type="text" id="nomeInput" placeholder="Digite o nome"/><br/>
+  <label>Função/Papel:</label>
+  <select id="funcaoSelect"></select><br/>
+  <label>Observações:</label>
+  <textarea id="obsArea"></textarea>
+  <div>
+    <button id="addBtn">➕ Adicionar</button>
+    <button id="editBtn">✏️ Editar</button>
+    <button id="deleteBtn">🗑️ Apagar</button>
+    <button id="saveBtn">💾 Salvar</button>
+  </div>
+  <div class="list" id="listContainer"></div>
+</div>
+<div class="statusbar" id="statusBar">Pronto.</div>
+
+<script>
+const body=document.body,themeBtn=document.getElementById('toggleTheme');
+body.classList.toggle('light',localStorage.getItem('theme')==='light');
+themeBtn.onclick=()=>{body.classList.toggle('light');localStorage.setItem('theme',body.classList.contains('light')?'light':'dark');};
+function status(msg){document.getElementById('statusBar').textContent=msg;}
+let users=[];
+async function carregarFuncoes(){
+  try{
+    const r=await fetch('dados_papeis_encrypted.json');
+    const file=await r.json();
+    const key=prompt('Informe a chave para ler Funções do banco de papéis:');
+    const dec=await decryptAES(file,key);
+    const dados_papeis=JSON.parse(dec).dados_papeis||[];
+    const sel=document.getElementById('funcaoSelect');
+    sel.innerHTML=dados_papeis.map(d=>`<option>${d['Função']}</option>`).join('');
+    status('Funções carregadas de dados_papeis_encrypted.json.');
+  }catch(e){status('Erro ao carregar funções.');}
+}
+carregarFuncoes();
+function renderList(){
+  const list=document.getElementById('listContainer');
+  list.innerHTML=users.map((u,i)=>`<div class="list-item" onclick="selecionar(${i})">${u.Nome} - ${u.Função}</div>`).join('');
+}
+let selecionado=-1;
+window.selecionar=(i)=>{
+  selecionado=i;
+  const u=users[i];
+  document.getElementById('nomeInput').value=u.Nome;
+  document.getElementById('funcaoSelect').value=u.Função;
+  document.getElementById('obsArea').value=u.Observações;
+  status('Usuário selecionado: '+u.Nome);
+};
+document.getElementById('addBtn').onclick=()=>{
+  const nome=document.getElementById('nomeInput').value.trim();
+  const funcao=document.getElementById('funcaoSelect').value;
+  const obs=document.getElementById('obsArea').value;
+  if(!nome)return status('Informe o nome.');
+  users.push({Nome:nome,Função:funcao,Observações:obs});
+  renderList();status('Usuário adicionado.');
+};
+document.getElementById('editBtn').onclick=()=>{
+  if(selecionado<0)return;
+  users[selecionado]={Nome:document.getElementById('nomeInput').value.trim(),Função:document.getElementById('funcaoSelect').value,Observações:document.getElementById('obsArea').value};
+  renderList();status('Usuário editado.');
+};
+document.getElementById('deleteBtn').onclick=()=>{
+  if(selecionado<0)return;
+  users.splice(selecionado,1);
+  selecionado=-1;
+  renderList();status('Usuário removido.');
+};
+document.getElementById('saveBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify({dados_users:users},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dados_users.json';a.click();
+  status('Arquivo salvo localmente.');
+};
+document.getElementById('exportJSON').onclick=()=>{
+  const blob=new Blob([JSON.stringify({dados_users:users},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='export_users.json';a.click();
+  status('Exportado com sucesso.');
+};
+document.getElementById('importJSON').onclick=()=>{
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=async()=>{const t=await inp.files[0].text();users=JSON.parse(t).dados_users||[];renderList();status('Importado.');};
+  inp.click();
+};
+document.getElementById('loadEncrypted').onclick=async()=>{
+  try{
+    const key=prompt('Informe a chave de descriptografia:');
+    const file=await fetch('dados_users_encrypted.json').then(r=>r.json());
+    const dec=await decryptAES(file,key);
+    users=JSON.parse(dec).dados_users||[];
+    renderList();status('Banco descriptografado com sucesso.');
+  }catch(e){status('Falha na descriptografia.');}
+};
+async function decryptAES(obj,password){
+  const dec=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
+  const salt=dec(obj.salt),nonce=dec(obj.nonce),ct=dec(obj.ciphertext);
+  const keyMaterial=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:500000,hash:'SHA-512'},keyMaterial,{name:'AES-GCM',length:256},false,['decrypt']);
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:nonce,tagLength:128},key,ct);
+  return new TextDecoder().decode(plain);
+}
+</script>
+</body>
+</html>
