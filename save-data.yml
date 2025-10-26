@@ -1,0 +1,28 @@
+name: Save data from web app
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: "JSON payload from the web app"
+        required: true
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Decode and save payload
+        run: |
+          echo '${{ github.event.inputs.payload }}' > dados_projetos_encrypted.json
+          echo "Arquivo salvo: dados_projetos_encrypted.json"
+
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Action Bot"
+          git config user.email "actions@github.com"
+          git add dados_projetos_encrypted.json
+          git commit -m "Atualização via botão Save to Server" || echo "Nenhuma alteração"
+          git push
