@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📁 PROJETOS - iectta (full)</title>
+<style>
+  body {font-family: Arial, sans-serif; background:#f5f7fa; color:#333; margin:0; padding:20px; transition:background .3s,color .3s,filter .3s;}
+  h1 {margin:0; font-size:1.4rem;}
+  .section {background:#fff; border-radius:10px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:20px;}
+  table {width:100%; border-collapse:collapse; margin-top:10px;}
+  th, td {padding:8px; border-bottom:1px solid #ddd; text-align:left;}
+  tr.selected {background:#cce5ff;}
+  input[type=text], textarea, select {width:100%; padding:6px; border-radius:6px; border:1px solid #ccc;}
+  button {padding:8px 12px; border:none; border-radius:6px; background:#0077cc; color:#fff; cursor:pointer; margin:4px;}
+  button:hover {background:#005fa3;}
+  .dark {background:#1e1f22; color:#ddd;}
+  .dark .section{background:#2c2d31; box-shadow:none;}
+  .dark input,.dark textarea,.dark select{background:#3a3b3f; color:#eee; border:1px solid #555;}
+  .dark table th,.dark table td{border-color:#444;}
+  .topbar {display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap;}
+  .btn-group {display:flex; gap:6px; flex-wrap:wrap;}
+  #keyModal {position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45); display:flex; justify-content:center; align-items:center; z-index:1000;}
+  #keyBox {background:#fff; padding:30px; border-radius:10px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.3); max-width:320px; width:90%; z-index:1100;}
+  #keyInput {width:100%; padding:10px; border-radius:6px; border:1px solid #ccc; margin-top:10px;}
+  #contentWrapper.locked {filter:blur(6px);}
+  #statusbar {text-align:center; font-size:14px; padding:6px; border-radius:6px; background:#0077cc; color:white; opacity:0; transition:opacity 0.6s;}
+  .dark #statusbar{background:#005fa3;}
+</style>
+</head>
+<body>
+<div id="contentWrapper" class="locked">
+  <div class="topbar">
+    <h1>📁 PROJETOS - iectta</h1>
+    <div class="btn-group">
+      <button onclick="toggleDarkMode()">🌗 Modo</button>
+      <button id="loadEncrypted">🔐 Descriptografar</button>
+      <button id="exportJSON">💾 Exportar</button>
+      <button id="importJSON">📂 Importar</button>
+      <button id="saveToServer">💾 Save to Server</button>
+      <button id="loadFromServer">⬇️ Load from Server</button>
+    </div>
+  </div>
+  <div id="statusbar"></div>
+  <p style="text-align:center;">Sistema criptografado de gestão e acompanhamento de projetos institucionais</p>
+
+  <div class="section">
+    <h2>📋 Projetos</h2>
+    <table id="projectsTable">
+      <thead><tr><th>Projeto</th><th>Descrição</th><th>Participante</th><th>Funções</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Adicionar / Editar Projeto</h3>
+    <input type="text" id="projInput" placeholder="Nome do Projeto">
+    <textarea id="descInput" placeholder="Descrição do Projeto"></textarea>
+    <input type="text" id="partInput" placeholder="Participante">
+    <input type="text" id="funcInput" placeholder="Funções ou Responsabilidades">
+    <select id="statusInput">
+      <option>Idea</option><option>Planning</option><option>Prototype</option>
+      <option>Testing</option><option>Deploying</option><option>Live</option><option>Finished</option>
+    </select>
+    <div>
+      <button onclick="addOrUpdateProject()">➕ Adicionar</button>
+      <button onclick="editSelected()">✏️ Editar</button>
+      <button onclick="deleteSelected()">🗑️ Apagar</button>
+    </div>
+  </div>
+
+  <div class="section" style="text-align:center;">
+    <h2>📦 Gerenciar Dados</h2>
+    <button onclick="exportData()">⬇️ Exportar (.json)</button>
+    <input type="file" id="importFile" accept=".json,.txt" style="display:none" onchange="importData(event)">
+    <button onclick="document.getElementById('importFile').click()">⬆️ Importar</button>
+    <button onclick="resetDatabase()">🧹 Resetar Dados</button>
+  </div>
+</div>
+
+<div id="keyModal">
+  <div id="keyBox">
+    <h2>🔐 Digite sua chave de criptografia</h2>
+    <input id="keyInput" type="password" placeholder="Chave de acesso" autofocus>
+    <button id="unlockBtn" onclick="unlockData()">Desbloquear</button>
+  </div>
+</div>
+
+<script>
+let projetos=[], selectedIndex=null, editMode=false, sessionPassword=null;
+const tableBody=document.querySelector('#projectsTable tbody');
+const DB_KEY='dados_projetos.json';
+const GITHUB_OWNER='intelectta';
+const GITHUB_REPO='grupo';
+const BRANCH='main';
+const FILE_PATH='dados_projetos_encrypted.json';
+
+function showStatus(msg){
+  const sb=document.getElementById('statusbar');
+  sb.textContent=msg; sb.style.opacity=1;
+  clearTimeout(sb.timer);
+  sb.timer=setTimeout(()=>sb.style.opacity=0,4000);
+}
+
+async function deriveKey(password,salt){
+  const enc=new TextEncoder();
+  const keyMaterial=await crypto.subtle.importKey('raw',enc.encode(password),{name:'PBKDF2'},false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptData(obj){
+  const enc=new TextEncoder();
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const key=await deriveKey(sessionPassword,salt);
+  const data=enc.encode(JSON.stringify(obj));
+  const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data);
+  const combined=new Uint8Array(salt.byteLength+iv.byteLength+encrypted.byteLength);
+  combined.set(salt,0); combined.set(iv,salt.byteLength); combined.set(new Uint8Array(encrypted),salt.byteLength+iv.byteLength);
+  return btoa(String.fromCharCode(...combined));
+}
+async function decryptData(b64){
+  try{
+    const bytes=new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
+    const salt=bytes.slice(0,16), iv=bytes.slice(16,28), data=bytes.slice(28);
+    const key=await deriveKey(sessionPassword,salt);
+    const decrypted=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+    return JSON.parse(new TextDecoder().decode(decrypted));
+  }catch{throw new Error('fail');}
+}
+
+function renderTable(){
+  tableBody.innerHTML='';
+  projetos.forEach((p,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${p.projeto}</td><td>${p.descricao}</td><td>${p.participante}</td><td>${p.funcoes}</td><td>${p.status}</td>`;
+    if(i===selectedIndex)tr.classList.add('selected');
+    tr.onclick=()=>selectRow(i);
+    tableBody.appendChild(tr);
+  });
+}
+function selectRow(i){selectedIndex=i;renderTable();showStatus(`🟦 Projeto selecionado: ${projetos[i].projeto}`);}
+function addOrUpdateProject(){
+  const projeto=document.getElementById('projInput').value.trim(),descricao=document.getElementById('descInput').value.trim(),participante=document.getElementById('partInput').value.trim(),funcoes=document.getElementById('funcInput').value.trim(),status=document.getElementById('statusInput').value;
+  if(!projeto)return alert('Informe o nome do projeto.');
+  const newEntry={projeto,descricao,participante,funcoes,status};
+  if(editMode && selectedIndex!=null){projetos[selectedIndex]=newEntry;showStatus(`✏️ Projeto atualizado: ${projeto}`);}else{projetos.push(newEntry);showStatus(`✅ Projeto adicionado: ${projeto}`);}
+  editMode=false; selectedIndex=null;clearForm(); renderTable(); saveEncrypted();
+}
+function editSelected(){
+  if(selectedIndex==null)return alert('Selecione um projeto.');
+  const p=projetos[selectedIndex];
+  document.getElementById('projInput').value=p.projeto;
+  document.getElementById('descInput').value=p.descricao;
+  document.getElementById('partInput').value=p.participante;
+  document.getElementById('funcInput').value=p.funcoes;
+  document.getElementById('statusInput').value=p.status;
+  editMode=true;showStatus(`✏️ Editando projeto #${selectedIndex+1} (${p.projeto})`);
+}
+function deleteSelected(){
+  if(selectedIndex==null)return alert('Selecione um projeto.');
+  if(confirm('Apagar este projeto?')){const removed=projetos.splice(selectedIndex,1)[0];selectedIndex=null;renderTable();saveEncrypted();showStatus(`🗑️ Projeto removido: ${removed.projeto}`);}
+}
+function clearForm(){document.getElementById('projInput').value='';document.getElementById('descInput').value='';document.getElementById('partInput').value='';document.getElementById('funcInput').value='';document.getElementById('statusInput').value='Planning';}
+async function saveEncrypted(){const enc=await encryptData({projetos});localStorage.setItem(DB_KEY,enc);}
+
+async function exportData(){const enc=await encryptData({projetos});const blob=new Blob([enc],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dados_projetos_encrypted.json';a.click();showStatus('⬇️ Dados exportados com sucesso');}
+async function importData(e){const file=e.target.files[0];if(!file)return;const text=await file.text();try{const imported=await decryptData(text);projetos=(imported.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();saveEncrypted();showStatus('⬆️ Dados importados e descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');}}
+function resetDatabase(){if(confirm('Apagar todos os dados locais?')){localStorage.removeItem(DB_KEY);projetos=[];renderTable();showStatus('🧹 Banco de dados limpo');}}
+function toggleDarkMode(){document.body.classList.toggle('dark');localStorage.setItem('darkMode',document.body.classList.contains('dark'))}
+if(localStorage.getItem('darkMode')==='true')document.body.classList.add('dark');
+
+async function unlockData(){const pw=document.getElementById('keyInput').value.trim();if(!pw)return alert('Digite uma chave.');sessionPassword=pw;const stored=localStorage.getItem(DB_KEY);if(stored){try{const dec=await decryptData(stored);projetos=(dec.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();showStatus('🔓 Dados descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');return;}}else{projetos=[];showStatus('🆕 Novo banco criado');}document.getElementById('keyModal').style.display='none';document.getElementById('contentWrapper').classList.remove('locked');}
+window.addEventListener('load',()=>{const input=document.getElementById('keyInput');input.focus();input.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();unlockData();}});});
+
+// ==== botões ====
+document.getElementById('loadEncrypted').onclick=()=>unlockData();
+document.getElementById('exportJSON').onclick=()=>exportData();
+document.getElementById('importJSON').onclick=()=>document.getElementById('importFile').click();
+
+// ==== Save to Server ====
+document.getElementById('saveToServer').onclick = async () => {
+  const token = prompt('🔑 Informe seu token GitHub (PAT):');
+  if (!token) return showStatus('❌ Nenhum token informado.');
+  showStatus('⏳ Enviando dados criptografados...');
+  try {
+    const enc = await encryptData({projetos});
+    const payload = { content: enc };
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/save-data.yml/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: BRANCH, inputs: { payload: JSON.stringify(payload) } })
+    });
+    if (res.ok) showStatus('✅ Dados criptografados enviados ao servidor com sucesso!');
+    else showStatus('❌ Falha ao enviar: ' + (await res.text()));
+  } catch (e) {
+    showStatus('⚠️ Erro ao enviar: ' + e.message);
+  }
+};
+
+// ==== Load from Server ====
+document.getElementById('loadFromServer').onclick = async () => {
+  const RAW_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${BRANCH}/${FILE_PATH}`;
+  showStatus('⏳ Baixando dados criptografados do servidor...');
+  try {
+    const res = await fetch(RAW_URL, {cache:'no-store'});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const txt = await res.text();
+    let data;
+    try{ data = JSON.parse(txt); }catch{ data = {ciphertext:txt}; }
+    const content = data.ciphertext || txt;
+    const dec = await decryptData(content);
+    projetos = (dec.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});
+    renderTable();
+    await saveEncrypted();
+    showStatus('✅ Dados descriptografados carregados do servidor.');
+  } catch(e){
+    showStatus('❌ Erro ao carregar do servidor: ' + e.message);
+  }
+};
+</script>
+</body>
+</html>
