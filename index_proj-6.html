@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>📁 PROJETOS - iectta (full)</title>
+<title>📁 PROJETOS - iectta (full workflows)</title>
 <style>
   body {font-family: Arial, sans-serif; background:#f5f7fa; color:#333; margin:0; padding:20px; transition:background .3s,color .3s,filter .3s;}
   h1 {margin:0; font-size:1.4rem;}
@@ -90,7 +90,8 @@ const tableBody=document.querySelector('#projectsTable tbody');
 const DB_KEY='dados_projetos.json';
 const GITHUB_OWNER='intelectta';
 const GITHUB_REPO='grupo';
-const BRANCH='main';
+const BRANCH='workflows';
+const WORKFLOW_ID='static.yml';
 const FILE_PATH='dados_projetos_encrypted.json';
 
 function showStatus(msg){
@@ -170,12 +171,10 @@ if(localStorage.getItem('darkMode')==='true')document.body.classList.add('dark')
 async function unlockData(){const pw=document.getElementById('keyInput').value.trim();if(!pw)return alert('Digite uma chave.');sessionPassword=pw;const stored=localStorage.getItem(DB_KEY);if(stored){try{const dec=await decryptData(stored);projetos=(dec.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();showStatus('🔓 Dados descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');return;}}else{projetos=[];showStatus('🆕 Novo banco criado');}document.getElementById('keyModal').style.display='none';document.getElementById('contentWrapper').classList.remove('locked');}
 window.addEventListener('load',()=>{const input=document.getElementById('keyInput');input.focus();input.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();unlockData();}});});
 
-// ==== botões ====
 document.getElementById('loadEncrypted').onclick=()=>unlockData();
 document.getElementById('exportJSON').onclick=()=>exportData();
 document.getElementById('importJSON').onclick=()=>document.getElementById('importFile').click();
 
-// ==== Save to Server ====
 document.getElementById('saveToServer').onclick = async () => {
   const token = prompt('🔑 Informe seu token GitHub (PAT):');
   if (!token) return showStatus('❌ Nenhum token informado.');
@@ -183,7 +182,7 @@ document.getElementById('saveToServer').onclick = async () => {
   try {
     const enc = await encryptData({projetos});
     const payload = { content: enc };
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/save-data.yml/dispatches`, {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_ID}/dispatches`, {
       method: 'POST',
       headers: {
         'Authorization': `token ${token}`,
@@ -199,7 +198,6 @@ document.getElementById('saveToServer').onclick = async () => {
   }
 };
 
-// ==== Load from Server ====
 document.getElementById('loadFromServer').onclick = async () => {
   const RAW_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${BRANCH}/${FILE_PATH}`;
   showStatus('⏳ Baixando dados criptografados do servidor...');
