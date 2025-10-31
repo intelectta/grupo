@@ -25,9 +25,9 @@
   <h1>USERS - iectta v10</h1>
   <div>
     <button id="toggleTheme">🌗 Tema</button>
-    <button id="loadEncrypted">🔐 Descriptografar</button>
-    <button id="exportJSON">💾 Exportar</button>
-    <button id="importJSON">📂 Importar</button>
+    <a href="/admin/" style="text-decoration:none;"><button>⚙️ Gerenciar Conteúdo</button></a>
+    
+    
   </div>
 </header>
 
@@ -57,6 +57,7 @@ body.classList.toggle('light',localStorage.getItem('theme')==='light');
 themeBtn.onclick=()=>{body.classList.toggle('light');localStorage.setItem('theme',body.classList.contains('light')?'light':'dark');};
 function status(msg){document.getElementById('statusBar').textContent=msg;}
 let users=[];
+loadUsersFromGit();
 
 // ==== Carregar CSV de funções ====
 async function carregarFuncoes(){
@@ -120,46 +121,30 @@ document.getElementById('deleteBtn').onclick=()=>{
   renderList();status('Usuário removido.');
 };
 document.getElementById('saveBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify({dados_users:users},null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='dados_users.json';
-  a.click();
-  status('Arquivo salvo localmente.');
+  status('Aviso: O botão Salvar localmente foi desativado. Use o Gerenciamento de Conteúdo para salvar no Git.');
 };
 
-// ==== Export / Import ====
-document.getElementById('exportJSON').onclick=()=>{
-  const blob=new Blob([JSON.stringify({dados_users:users},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='export_users.json';a.click();
-  status('Exportado com sucesso.');
-};
-document.getElementById('importJSON').onclick=()=>{
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
-  inp.onchange=async()=>{const t=await inp.files[0].text();users=JSON.parse(t).dados_users||[];renderList();status('Importado.');};
-  inp.click();
-};
+// Export/Import functionality removed. Data is managed by Netlify CMS.
 
-// ==== Descriptografia AES-GCM ====
-document.getElementById('loadEncrypted').onclick=async()=>{
+// Client-side encryption/decryption removed. Data is managed by Netlify CMS.
+
+// ==== Carregamento de Dados do Git ====
+const DB_KEY_USERS_10='dados_users_encrypted.json';
+
+async function loadUsersFromGit(){
   try{
-    const key=prompt('Informe a chave de descriptografia:');
-    const file=await fetch('dados_users_encrypted.json').then(r=>r.json());
-    const dec=await decryptAES(file,key);
-    users=JSON.parse(dec).dados_users||[];
+    const response = await fetch(DB_KEY_USERS_10);
+    if (!response.ok) throw new Error(\`Failed to fetch \${DB_KEY_USERS_10}\`);
+    const data = await response.json();
+    users = data.dados_users || [];
     renderList();
-    status('Banco descriptografado com sucesso.');
-  }catch(e){status('Falha na descriptografia.');}
-};
-
-async function decryptAES(obj,password){
-  const dec=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
-  const salt=dec(obj.salt),nonce=dec(obj.nonce),ct=dec(obj.ciphertext);
-  const keyMaterial=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);
-  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:500000,hash:'SHA-512'},keyMaterial,{name:'AES-GCM',length:256},false,['decrypt']);
-  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:nonce,tagLength:128},key,ct);
-  return new TextDecoder().decode(plain);
+    status('Dados carregados do Git com sucesso.');
+  }catch(error){
+    console.error("Erro ao carregar dados do Git:", error);
+    status('❌ Erro ao carregar dados do Git. A edição deve ser feita pelo CMS.');
+  }
 }
+loadUsersFromGit();
 </script>
 </body>
 </html>

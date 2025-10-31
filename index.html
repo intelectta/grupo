@@ -27,16 +27,17 @@
   #statusbar {text-align:center; font-size:14px; padding:6px; border-radius:6px; background:#0077cc; color:white; opacity:0; transition:opacity 0.6s;}
   .dark #statusbar{background:#005fa3;}
 </style>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
-<div id="contentWrapper" class="locked">
+<div id="contentWrapper">
   <div class="topbar">
     <h1>📁 PROJETOS - iectta</h1>
     <div class="btn-group">
       <button onclick="toggleDarkMode()">🌗 Modo</button>
-      <button id="loadEncrypted">🔐 Descriptografar</button>
-      <button id="exportJSON">💾 Exportar</button>
-      <button id="importJSON">📂 Importar</button>
+      <a href="/admin/" style="text-decoration:none;"><button>⚙️ Gerenciar Conteúdo</button></a>
+      
+      
     </div>
   </div>
   <div id="statusbar"></div>
@@ -66,26 +67,16 @@
   </div>
 
   <div class="section" style="text-align:center;">
-    <h2>📦 Gerenciar Dados</h2>
-    <button onclick="exportData()">⬇️ Exportar (.json)</button>
-    <input type="file" id="importFile" accept=".json,.txt" style="display:none" onchange="importData(event)">
-    <button onclick="document.getElementById('importFile').click()">⬆️ Importar</button>
-    <button onclick="resetDatabase()">🧹 Resetar Dados</button>
+    <h2>📦 Gerenciar Dados (Local)</h2>
+    <button onclick="resetDatabase()">🧹 Resetar Dados Locais</button>
+    <p>Para salvar mudanças no Git, use o painel de Gerenciamento de Conteúdo.</p>
   </div>
-</div>
 
-<div id="keyModal">
-  <div id="keyBox">
-    <h2>🔐 Digite sua chave de criptografia</h2>
-    <input id="keyInput" type="password" placeholder="Chave de acesso" autofocus>
-    <button id="unlockBtn" onclick="unlockData()">Desbloquear</button>
-  </div>
-</div>
 
 <script>
-let projetos=[], selectedIndex=null, editMode=false, sessionPassword=null;
+let projetos=[], selectedIndex=null, editMode=false;
 const tableBody=document.querySelector('#projectsTable tbody');
-const DB_KEY='dados_projetos.json';
+const DB_KEY='dados_projetos_encrypted.json'; // File to load from Git
 
 function showStatus(msg){
   const sb=document.getElementById('statusbar');
@@ -94,31 +85,7 @@ function showStatus(msg){
   sb.timer=setTimeout(()=>sb.style.opacity=0,4000);
 }
 
-async function deriveKey(password,salt){
-  const enc=new TextEncoder();
-  const keyMaterial=await crypto.subtle.importKey('raw',enc.encode(password),{name:'PBKDF2'},false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function encryptData(obj){
-  const enc=new TextEncoder();
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const key=await deriveKey(sessionPassword,salt);
-  const data=enc.encode(JSON.stringify(obj));
-  const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data);
-  const combined=new Uint8Array(salt.byteLength+iv.byteLength+encrypted.byteLength);
-  combined.set(salt,0); combined.set(iv,salt.byteLength); combined.set(new Uint8Array(encrypted),salt.byteLength+iv.byteLength);
-  return btoa(String.fromCharCode(...combined));
-}
-async function decryptData(b64){
-  try{
-    const bytes=new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
-    const salt=bytes.slice(0,16), iv=bytes.slice(16,28), data=bytes.slice(28);
-    const key=await deriveKey(sessionPassword,salt);
-    const decrypted=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
-    return JSON.parse(new TextDecoder().decode(decrypted));
-  }catch{throw new Error('fail');}
-}
+
 
 function renderTable(){
   tableBody.innerHTML='';
@@ -153,21 +120,66 @@ function deleteSelected(){
   if(confirm('Apagar este projeto?')){const removed=projetos.splice(selectedIndex,1)[0];selectedIndex=null;renderTable();saveEncrypted();showStatus(`🗑️ Projeto removido: ${removed.projeto}`);}
 }
 function clearForm(){document.getElementById('projInput').value='';document.getElementById('descInput').value='';document.getElementById('partInput').value='';document.getElementById('funcInput').value='';document.getElementById('statusInput').value='Planning';}
-async function saveEncrypted(){const enc=await encryptData({projetos});localStorage.setItem(DB_KEY,enc);}
+// Removed saveEncrypted function. Data will be saved via Netlify CMS.
 
-async function exportData(){const enc=await encryptData({projetos});const blob=new Blob([enc],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dados_projetos_encrypted.json';a.click();showStatus('⬇️ Dados exportados com sucesso');}
-async function importData(e){const file=e.target.files[0];if(!file)return;const text=await file.text();try{const imported=await decryptData(text);projetos=(imported.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();saveEncrypted();showStatus('⬆️ Dados importados e descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');}}
-function resetDatabase(){if(confirm('Apagar todos os dados locais?')){localStorage.removeItem(DB_KEY);projetos=[];renderTable();showStatus('🧹 Banco de dados limpo');}}
+// Removed exportData function. Data will be managed by Netlify CMS.
+// Removed importData function. Data will be managed by Netlify CMS.
+function resetDatabase(){if(confirm('Apagar todos os dados locais?')){localStorage.removeItem('projetos');projetos=[];renderTable();showStatus('🧹 Banco de dados limpo');}}
 function toggleDarkMode(){document.body.classList.toggle('dark');localStorage.setItem('darkMode',document.body.classList.contains('dark'));}
 if(localStorage.getItem('darkMode')==='true')document.body.classList.add('dark');
 
-async function unlockData(){const pw=document.getElementById('keyInput').value.trim();if(!pw)return alert('Digite uma chave.');sessionPassword=pw;const stored=localStorage.getItem(DB_KEY);if(stored){try{const dec=await decryptData(stored);projetos=(dec.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();showStatus('🔓 Dados descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');return;}}else{projetos=[];showStatus('🆕 Novo banco criado');}document.getElementById('keyModal').style.display='none';document.getElementById('contentWrapper').classList.remove('locked');}
-window.addEventListener('load',()=>{const input=document.getElementById('keyInput');input.focus();input.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();unlockData();}});});
+// The site will now load the data from the JSON file via fetch, which is managed by Netlify CMS.
+async function loadProjectsFromGit(){
+  try {
+    const response = await fetch(DB_KEY);
+    if (!response.ok) throw new Error(\`Failed to fetch \${DB_KEY}\`);
+    const data = await response.json();
+    projetos = (data.projetos || []).map(p => p.status ? p : { ...p, status: 'Planning' });
+    renderTable();
+    showStatus('✅ Dados carregados do Git com sucesso');
+  } catch (error) {
+    console.error('Erro ao carregar dados:', error);
+    showStatus('❌ Erro ao carregar dados do Git.');
+    // Fallback to local storage if Git data is unavailable
+    const stored = localStorage.getItem('projetos');
+    if (stored) {
+      try {
+        projetos = JSON.parse(stored);
+        renderTable();
+        showStatus('⚠️ Dados carregados do LocalStorage (falha no Git).');
+      } catch {
+        projetos = [];
+        showStatus('⚠️ Dados do LocalStorage corrompidos. Novo banco criado.');
+      }
+    } else {
+      projetos = [];
+      showStatus('🆕 Novo banco de dados de projetos criado.');
+    }
+  }
+}
+window.addEventListener('load', loadProjectsFromGit);
 
-// ==== novos botoes ====
-document.getElementById('loadEncrypted').onclick=()=>unlockData();
-document.getElementById('exportJSON').onclick=()=>exportData();
-document.getElementById('importJSON').onclick=()=>document.getElementById('importFile').click();
+// Client-side save is only for local testing/fallback. The primary save mechanism is the CMS.
+function saveLocalFallback(){
+  localStorage.setItem('projetos', JSON.stringify(projetos));
+}
+
+// Update addOrUpdateProject to save to local storage as a fallback
+function addOrUpdateProject(){
+  const projeto=document.getElementById('projInput').value.trim(),descricao=document.getElementById('descInput').value.trim(),participante=document.getElementById('partInput').value.trim(),funcoes=document.getElementById('funcInput').value.trim(),status=document.getElementById('statusInput').value;
+  if(!projeto)return alert('Informe o nome do projeto.');
+  const newEntry={projeto,descricao,participante,funcoes,status};
+  if(editMode && selectedIndex!=null){projetos[selectedIndex]=newEntry;showStatus(`✏️ Projeto atualizado: ${projeto}`);}else{projetos.push(newEntry);showStatus(`✅ Projeto adicionado: ${projeto}`);}
+  editMode=false; selectedIndex=null;clearForm(); renderTable(); saveLocalFallback(); // Use local save fallback
+}
+
+function deleteSelected(){
+  if(selectedIndex==null)return alert('Selecione um projeto.');
+  if(confirm('Apagar este projeto?')){const removed=projetos.splice(selectedIndex,1)[0];selectedIndex=null;renderTable();saveLocalFallback();showStatus(`🗑️ Projeto removido: ${removed.projeto}`);} // Use local save fallback
+}
+
+// Remove old button listeners, the new button is a link to /admin/
+
 </script>
 </body>
 </html>

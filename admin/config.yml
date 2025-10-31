@@ -1,0 +1,141 @@
+backend:
+  name: github
+  repo: intelectta/grupo
+  branch: main # Assuming the main branch is where the site is deployed from
+
+# The media folder is where files uploaded through the CMS are stored.
+media_folder: "assets/uploads"
+
+# The public path for uploaded files.
+public_folder: "/assets/uploads"
+
+# Collections are the content types you want to manage.
+collections:
+  - name: "projects"
+    label: "Projetos"
+    folder: "dados" # A folder to store the data files, which we will configure to be a single file
+    create: false # Do not allow creating new files, only editing the main data file
+    delete: false # Do not allow deleting the main data file
+    editor:
+      preview: false
+    files:
+      - file: "dados_projetos_encrypted.json" # The file to be edited
+        label: "Lista de Projetos"
+        name: "project_list"
+        fields:
+          - label: "Projetos"
+            name: "projetos"
+            widget: "list"
+            fields:
+              - label: "Projeto"
+                name: "projeto"
+                widget: "string"
+              - label: "Descrição"
+                name: "descricao"
+                widget: "text"
+              - label: "Participante"
+                name: "participante"
+                widget: "string"
+              - label: "Funções"
+                name: "funcoes"
+                widget: "string"
+              - label: "Status"
+                name: "status"
+                widget: "select"
+                options: ["Idea", "Planning", "Prototype", "Testing", "Deploying", "Live", "Finished"]
+                default: "Planning"
+
+  - name: "papeis"
+    label: "Papéis"
+    folder: "dados"
+    create: false
+    delete: false
+    editor:
+      preview: false
+    files:
+      - file: "dados_papeis_encrypted.json"
+        label: "Lista de Papéis"
+        name: "papeis_list"
+        fields:
+          - label: "Dados Papéis"
+            name: "dados_papeis"
+            widget: "list"
+            fields:
+              - label: "Função"
+                name: "Função"
+                widget: "string"
+              - label: "Escopo"
+                name: "Escopo"
+                widget: "select"
+                options: ["iectta", "Parceiro", "Colaborador", "Outro"]
+                default: "iectta"
+              - label: "Status"
+                name: "Status"
+                widget: "select"
+                options: ["Indefinido", "Existente", "Prévio", "Não Existente", "Buscando", "Proposta Enviada", "Aguardando"]
+                default: "Indefinido"
+              - label: "Descrição"
+                name: "Descrição"
+                widget: "text"
+              - label: "Tarefas"
+                name: "Tarefas"
+                widget: "list"
+                field:
+                  label: "Tarefa"
+                  name: "tarefa"
+                  widget: "string"
+
+  - name: "users"
+    label: "Participantes"
+    folder: "dados"
+    create: false
+    delete: false
+    editor:
+      preview: false
+    files:
+      - file: "dados_users-10.json" # Assuming this is the file to be edited
+        label: "Lista de Participantes"
+        name: "user_list"
+        fields:
+          - label: "Participantes"
+            name: "participants"
+            widget: "list"
+            fields:
+              - label: "Nome"
+                name: "name"
+                widget: "string"
+              - label: "Função / Papel"
+                name: "role"
+                widget: "string"
+              - label: "Observações"
+                name: "notes"
+                widget: "text"
+          - label: "Anotações Rápidas"
+            name: "notes"
+            widget: "text"
+
+  - name: "users_v10"
+    label: "Participantes v10"
+    folder: "dados"
+    create: false
+    delete: false
+    editor:
+      preview: false
+    files:
+      - file: "dados_users_encrypted.json" # Assuming this is the file to be edited
+        label: "Lista de Participantes v10"
+        name: "user_list_v10"
+        fields:
+          - label: "Usuários"
+            name: "dados_users"
+            widget: "list"
+            fields:
+              - label: "Nome"
+                name: "Nome"
+                widget: "string"
+              - label: "Função"
+                name: "Função"
+                widget: "string"
+              - label: "Observações"
+                name: "Observações"
+                widget: "text"

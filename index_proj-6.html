@@ -100,23 +100,6 @@ function showStatus(msg){
   sb.timer=setTimeout(()=>sb.style.opacity=0,4000);
 }
 
-async function deriveKey(password,salt){
-  const enc=new TextEncoder();
-  const keyMaterial=await crypto.subtle.importKey('raw',enc.encode(password),{name:'PBKDF2'},false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function encryptData(obj){
-  const enc=new TextEncoder();
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const key=await deriveKey(sessionPassword,salt);
-  const data=enc.encode(JSON.stringify(obj));
-  const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data);
-  const combined=new Uint8Array(salt.byteLength+iv.byteLength+encrypted.byteLength);
-  combined.set(salt,0); combined.set(iv,salt.byteLength); combined.set(new Uint8Array(encrypted),salt.byteLength+iv.byteLength);
-  return btoa(String.fromCharCode(...combined));
-}
-async function decryptData(b64){
   try{
     const bytes=new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
     const salt=bytes.slice(0,16), iv=bytes.slice(16,28), data=bytes.slice(28);
@@ -142,7 +125,6 @@ function addOrUpdateProject(){
   if(!projeto)return alert('Informe o nome do projeto.');
   const newEntry={projeto,descricao,participante,funcoes,status};
   if(editMode && selectedIndex!=null){projetos[selectedIndex]=newEntry;showStatus(`✏️ Projeto atualizado: ${projeto}`);}else{projetos.push(newEntry);showStatus(`✅ Projeto adicionado: ${projeto}`);}
-  editMode=false; selectedIndex=null;clearForm(); renderTable(); saveEncrypted();
 }
 function editSelected(){
   if(selectedIndex==null)return alert('Selecione um projeto.');
@@ -156,22 +138,18 @@ function editSelected(){
 }
 function deleteSelected(){
   if(selectedIndex==null)return alert('Selecione um projeto.');
-  if(confirm('Apagar este projeto?')){const removed=projetos.splice(selectedIndex,1)[0];selectedIndex=null;renderTable();saveEncrypted();showStatus(`🗑️ Projeto removido: ${removed.projeto}`);}
 }
 function clearForm(){document.getElementById('projInput').value='';document.getElementById('descInput').value='';document.getElementById('partInput').value='';document.getElementById('funcInput').value='';document.getElementById('statusInput').value='Planning';}
 async function saveEncrypted(){const enc=await encryptData({projetos});localStorage.setItem(DB_KEY,enc);}
 
 async function exportData(){const enc=await encryptData({projetos});const blob=new Blob([enc],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dados_projetos_encrypted.json';a.click();showStatus('⬇️ Dados exportados com sucesso');}
-async function importData(e){const file=e.target.files[0];if(!file)return;const text=await file.text();try{const imported=await decryptData(text);projetos=(imported.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();saveEncrypted();showStatus('⬆️ Dados importados e descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');}}
 function resetDatabase(){if(confirm('Apagar todos os dados locais?')){localStorage.removeItem(DB_KEY);projetos=[];renderTable();showStatus('🧹 Banco de dados limpo');}}
 function toggleDarkMode(){document.body.classList.toggle('dark');localStorage.setItem('darkMode',document.body.classList.contains('dark'))}
 if(localStorage.getItem('darkMode')==='true')document.body.classList.add('dark');
 
 async function unlockData(){const pw=document.getElementById('keyInput').value.trim();if(!pw)return alert('Digite uma chave.');sessionPassword=pw;const stored=localStorage.getItem(DB_KEY);if(stored){try{const dec=await decryptData(stored);projetos=(dec.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});renderTable();showStatus('🔓 Dados descriptografados com sucesso');}catch{alert('Chave incorreta ou dados inválidos.');return;}}else{projetos=[];showStatus('🆕 Novo banco criado');}document.getElementById('keyModal').style.display='none';document.getElementById('contentWrapper').classList.remove('locked');}
-window.addEventListener('load',()=>{const input=document.getElementById('keyInput');input.focus();input.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();unlockData();}});});
 
 // ==== botões ====
-document.getElementById('loadEncrypted').onclick=()=>unlockData();
 document.getElementById('exportJSON').onclick=()=>exportData();
 document.getElementById('importJSON').onclick=()=>document.getElementById('importFile').click();
 
@@ -213,7 +191,6 @@ document.getElementById('loadFromServer').onclick = async () => {
     const dec = await decryptData(content);
     projetos = (dec.projetos||[]).map(p=>p.status?p:{...p,status:'Planning'});
     renderTable();
-    await saveEncrypted();
     showStatus('✅ Dados descriptografados carregados do servidor.');
   } catch(e){
     showStatus('❌ Erro ao carregar do servidor: ' + e.message);

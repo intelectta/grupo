@@ -65,9 +65,9 @@
   <h1>papeis_iectta v12</h1>
   <div>
     <button id="toggleTheme">🌗 Tema</button>
-    <button id="loadEncrypted">🔐 Descriptografar</button>
-    <button id="exportJSON">💾 Exportar</button>
-    <button id="importJSON">📂 Importar</button>
+    <a href="/admin/" style="text-decoration:none;"><button>⚙️ Gerenciar Conteúdo</button></a>
+    
+    
   </div>
 </header>
 
@@ -118,17 +118,23 @@ function status(msg){document.getElementById('statusBar').textContent=msg;}
 
 // ==== base ====
 let dados=[];
-async function carregarJSON(){
+const DB_KEY_PAPEIS='dados_papeis_encrypted.json';
+
+async function carregarDadosDoGit(){
   try{
-    const r=await fetch('dados_papeis.json');
+    const r=await fetch(DB_KEY_PAPEIS);
+    if (!r.ok) throw new Error(\`Failed to fetch \${DB_KEY_PAPEIS}\`);
     const j=await r.json();
     dados=j.dados_papeis||[];
     popularFuncoes();
     renderList();
-    status('Dados carregados (modo aberto).');
-  }catch(e){status('Erro ao carregar JSON.');}
+    status('Dados carregados do Git com sucesso.');
+  }catch(e){
+    console.error('Erro ao carregar dados:', e);
+    status('❌ Erro ao carregar dados do Git. A edição deve ser feita pelo CMS.');
+  }
 }
-carregarJSON();
+carregarDadosDoGit();
 
 // ==== funções ====
 function popularFuncoes(){
@@ -176,46 +182,12 @@ document.getElementById('deleteBtn').onclick=()=>{
   renderList();status('Função removida.');
 };
 document.getElementById('saveBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify({dados_papeis:dados},null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='dados_papeis.json';
-  a.click();
-  status('Arquivo salvo localmente.');
-};
+	  status('Aviso: O botão Salvar localmente foi desativado. Use o Gerenciamento de Conteúdo para salvar no Git.');
+	};
 
-// ==== export/import ====
-document.getElementById('exportJSON').onclick=()=>{
-  const blob=new Blob([JSON.stringify({dados_papeis:dados},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='export_papeis.json';a.click();
-  status('Exportado com sucesso.');
-};
-document.getElementById('importJSON').onclick=()=>{
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
-  inp.onchange=async()=>{const t=await inp.files[0].text();dados=JSON.parse(t).dados_papeis||[];popularFuncoes();renderList();status('Importado.');};
-  inp.click();
-};
+// Export/Import functionality removed. Data is managed by Netlify CMS.
 
-// ==== descriptografia AES-GCM ====
-document.getElementById('loadEncrypted').onclick=async()=>{
-  try{
-    const key=prompt('Informe a chave de descriptografia:');
-    const file=await fetch('dados_papeis_encrypted.json').then(r=>r.json());
-    const dec=await decryptAES(file,key);
-    dados=JSON.parse(dec).dados_papeis||[];
-    popularFuncoes();renderList();
-    status('Banco descriptografado com sucesso.');
-  }catch(e){status('Falha na descriptografia.');}
-};
-
-async function decryptAES(obj,password){
-  const dec=b=>Uint8Array.from(atob(b),c=>c.charCodeAt(0));
-  const salt=dec(obj.salt),nonce=dec(obj.nonce),tag=dec(obj.tag),ct=dec(obj.ciphertext);
-  const keyMaterial=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);
-  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:500000,hash:'SHA-512'},keyMaterial,{name:'AES-GCM',length:256},false,['decrypt']);
-  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:nonce,additionalData:new Uint8Array(),tagLength:128},key,new Uint8Array([...ct]));
-  return new TextDecoder().decode(plain);
-}
+// Client-side encryption/decryption removed. Data is managed by Netlify CMS.
 </script>
 </body>
 </html>

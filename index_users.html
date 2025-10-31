@@ -39,10 +39,11 @@
 </head>
 <body>
 
-<div id="contentWrapper" class="locked">
+<div id="contentWrapper">
   <div class="topbar">
     <h1>🌐 DIREÇÃO - iectta</h1>
     <button onclick="toggleDarkMode()">🌗 Modo Escuro/Claro</button>
+    <a href="/admin/" style="text-decoration:none;"><button>⚙️ Gerenciar Conteúdo</button></a>
   </div>
   <p style="text-align:center;">Sistema colaborativo criptografado de acompanhamento institucional</p>
 
@@ -67,57 +68,22 @@
   </div>
 
   <div class="section" style="text-align:center;">
-    <h2>📦 Gerenciar Dados</h2>
-    <button onclick="exportData()">⬇️ Exportar</button>
-    <input type="file" id="importFile" accept=".json,.txt" style="display:none" onchange="importData(event)">
-    <button onclick="document.getElementById('importFile').click()">⬆️ Importar</button>
-    <button onclick="resetDatabase()">🧹 Resetar Dados</button>
+    <h2>📦 Gerenciar Dados (Local)</h2>
+    <button onclick="resetDatabase()">🧹 Resetar Dados Locais</button>
+    <p>Para salvar mudanças no Git, use o painel de Gerenciamento de Conteúdo.</p>
   </div>
 </div>
 
 <!-- Modal da chave -->
-<div id="keyModal">
-  <div id="keyBox">
-    <h2>🔐 Digite sua chave de criptografia</h2>
-    <input id="keyInput" type="password" placeholder="Chave de acesso" autofocus>
-    <button id="unlockBtn" onclick="unlockData()">Desbloquear</button>
-  </div>
-</div>
+
 
 <script>
 const tableBody=document.querySelector("#participantsTable tbody");
 let participants=[];
 let sessionPassword=null;
 
-// === Criptografia ===
-async function deriveKey(password,salt){
-  const enc=new TextEncoder();
-  const keyMaterial=await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
-  return crypto.subtle.deriveKey(
-    {name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},
-    keyMaterial,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]
-  );
-}
-async function encryptData(obj){
-  const enc=new TextEncoder();
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const key=await deriveKey(sessionPassword,salt);
-  const data=enc.encode(JSON.stringify(obj));
-  const encrypted=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,data);
-  const combined=new Uint8Array(salt.byteLength+iv.byteLength+encrypted.byteLength);
-  combined.set(salt,0); combined.set(iv,salt.byteLength); combined.set(new Uint8Array(encrypted),salt.byteLength+iv.byteLength);
-  return btoa(String.fromCharCode(...combined));
-}
-async function decryptData(b64){
-  try{
-    const bytes=new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
-    const salt=bytes.slice(0,16); const iv=bytes.slice(16,28); const data=bytes.slice(28);
-    const key=await deriveKey(sessionPassword,salt);
-    const decrypted=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,data);
-    const dec=new TextDecoder(); return JSON.parse(dec.decode(decrypted));
-  }catch(e){throw new Error("fail");}
-}
+// === Criptografia (Removida) ===
+
 
 // === Dados ===
 function renderTable(){
@@ -134,43 +100,29 @@ function addParticipant(){
   const notes=document.getElementById("notesInput").value.trim();
   if(!name)return alert("Insira o nome.");
   participants.push({name,role,notes});
-  saveEncrypted();
   renderTable();
   document.getElementById("nameInput").value="";
   document.getElementById("roleInput").value="";
   document.getElementById("notesInput").value="";
 }
-async function saveEncrypted(){
+// Client-side save removed. Data is managed by Netlify CMS.
+function saveLocalFallback(){
   const data={participants,notes:document.getElementById("quickNotes").value};
-  const enc=await encryptData(data);
-  localStorage.setItem("encryptedDB",enc);
+  localStorage.setItem("localDB", JSON.stringify(data));
 }
 function saveNotes(){
-  saveEncrypted().then(()=>alert("Anotações salvas com criptografia!"));
+  saveLocalFallback();
+  alert("Anotações salvas localmente. Para salvar no Git, use o Gerenciamento de Conteúdo.");
 }
 async function exportData(){
-  const data={participants,notes:document.getElementById("quickNotes").value};
-  const enc=await encryptData(data);
-  const blob=new Blob([enc],{type:"text/plain"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="dados_iectta_encrypted.txt";
-  a.click();
+  alert("Exportação de dados removida. Use o Gerenciamento de Conteúdo para gerenciar dados.");
 }
 async function importData(event){
-  const file=event.target.files[0]; if(!file)return;
-  const text=await file.text();
-  try{
-    const imported=await decryptData(text);
-    participants=imported.participants||[];
-    document.getElementById("quickNotes").value=imported.notes||"";
-    renderTable(); saveEncrypted();
-    alert("Dados importados e descriptografados com sucesso!");
-  }catch(e){alert("Chave incorreta ou dados inválidos.");}
+  alert("Importação de dados removida. Use o Gerenciamento de Conteúdo para gerenciar dados.");
 }
 function resetDatabase(){
   if(confirm("Tem certeza que deseja apagar todos os dados locais? Esta ação não pode ser desfeita.")){
-    localStorage.removeItem("encryptedDB");
+    localStorage.removeItem("localDB");
     participants=[];
     document.getElementById("quickNotes").value="";
     renderTable();
@@ -185,34 +137,45 @@ function toggleDarkMode(){
 }
 if(localStorage.getItem("darkMode")==="true")document.body.classList.add("dark");
 
-// === Desbloqueio ===
-async function unlockData(){
-  const pw=document.getElementById("keyInput").value.trim();
-  if(!pw)return alert("Digite uma chave.");
-  sessionPassword=pw;
-  const stored=localStorage.getItem("encryptedDB");
-  if(stored){
-    try{
-      const decrypted=await decryptData(stored);
-      participants=decrypted.participants||[];
-      document.getElementById("quickNotes").value=decrypted.notes||"";
-      renderTable();
-    }catch(e){alert("Chave incorreta ou dados inválidos.");return;}
-  }else{
-    participants=[];document.getElementById("quickNotes").value="";
+// === Carregamento de Dados do Git ===
+const DB_KEY_USERS='dados_users-10.json'; // Assuming this is the main file for users based on the other files
+
+async function loadUsersFromGit(){
+  try{
+    const response = await fetch(DB_KEY_USERS);
+    if (!response.ok) throw new Error(\`Failed to fetch \${DB_KEY_USERS}\`);
+    const data = await response.json();
+    participants = data.participants || [];
+    document.getElementById("quickNotes").value = data.notes || "";
+    renderTable();
+    alert("Dados carregados do Git com sucesso!");
+  }catch(error){
+    console.error("Erro ao carregar dados do Git:", error);
+    alert("Erro ao carregar dados do Git. Verificando dados locais...");
+    // Fallback to local storage
+    const stored = localStorage.getItem("localDB");
+    if(stored){
+      try{
+        const localData = JSON.parse(stored);
+        participants = localData.participants || [];
+        document.getElementById("quickNotes").value = localData.notes || "";
+        renderTable();
+        alert("Dados carregados do LocalStorage (falha no Git).");
+      }catch{
+        participants = [];
+        document.getElementById("quickNotes").value = "";
+        alert("Novo banco de dados criado.");
+      }
+    } else {
+      participants = [];
+      document.getElementById("quickNotes").value = "";
+      alert("Novo banco de dados criado.");
+    }
   }
-  document.getElementById("keyModal").style.display="none";
-  document.getElementById("contentWrapper").classList.remove("locked");
 }
 
 // === Foco inicial e tecla ENTER ===
-window.addEventListener("load",()=>{
-  const input=document.getElementById("keyInput");
-  input.focus();
-  input.addEventListener("keypress",e=>{
-    if(e.key==="Enter"){e.preventDefault();unlockData();}
-  });
-});
+window.addEventListener("load", loadUsersFromGit);
 </script>
 
 </body>

@@ -102,23 +102,6 @@ function showStatus(msg){
   sb.timer=setTimeout(()=>sb.style.opacity=0,4000);
 }
 
-async function deriveKey(password,salt){
-  const enc=new TextEncoder();
-  const keyMaterial=await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
-  return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},keyMaterial,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
-}
-async function encryptData(obj){
-  const enc=new TextEncoder();
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const key=await deriveKey(sessionPassword,salt);
-  const data=enc.encode(JSON.stringify(obj));
-  const encrypted=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,data);
-  const combined=new Uint8Array(salt.byteLength+iv.byteLength+encrypted.byteLength);
-  combined.set(salt,0); combined.set(iv,salt.byteLength); combined.set(new Uint8Array(encrypted),salt.byteLength+iv.byteLength);
-  return btoa(String.fromCharCode(...combined));
-}
-async function decryptData(b64){
   try{
     const bytes=new Uint8Array([...atob(b64)].map(c=>c.charCodeAt(0)));
     const salt=bytes.slice(0,16), iv=bytes.slice(16,28), data=bytes.slice(28);
@@ -155,7 +138,6 @@ function addOrUpdateProject(){
     showStatus(`✅ Projeto adicionado: ${projeto}`);
   }
   editMode=false; selectedIndex=null;
-  clearForm(); renderTable(); saveEncrypted();
 }
 function editSelected(){
   if(selectedIndex==null)return alert("Selecione um projeto.");
@@ -172,7 +154,6 @@ function deleteSelected(){
   if(selectedIndex==null)return alert("Selecione um projeto.");
   if(confirm("Apagar este projeto?")){
     const removed=projetos.splice(selectedIndex,1)[0];
-    selectedIndex=null; renderTable(); saveEncrypted();
     showStatus(`🗑️ Projeto removido: ${removed.projeto}`);
   }
 }
@@ -198,7 +179,6 @@ async function importData(e){
   try{
     const imported=await decryptData(text);
     projetos=(imported.projetos||[]).map(p=>p.status?p:{...p,status:"Planning"});
-    renderTable();saveEncrypted();
     showStatus("⬆️ Dados importados e descriptografados com sucesso");
   }catch{alert("Chave incorreta ou dados inválidos.");}
 }
@@ -220,7 +200,6 @@ async function unlockData(){
 }
 window.addEventListener("load",()=>{
   const input=document.getElementById("keyInput");
-  input.focus();input.addEventListener("keypress",e=>{if(e.key==="Enter"){e.preventDefault();unlockData();}});
 });
 </script>
 </body>
